@@ -192,16 +192,19 @@ export default function PaymentForm() {
 
             <div className="bg-zinc-100 p-4 rounded-md">
               <div className="flex justify-between mb-1">
-                <span>$6.99/month (pre-tax)</span>
+                <span className="font-semibold">Free Trial</span>
                 <Link href="#" className="text-blue-600 hover:underline">
                   Change
                 </Link>
               </div>
-              <div className="text-sm text-zinc-600">Standard with ads</div>
+              <div className="text-sm text-zinc-600">
+                <span className="line-through mr-2">$6.99/month</span>
+                <span className="font-semibold">$15.49/month</span> (Standard plan)
+              </div>
             </div>
 
             <div className="text-sm text-zinc-600 mt-8">
-              By clicking the &quot;Start Membership&quot; button below, you agree to our{' '}
+              By clicking the &quot;Start Free Trial&quot; button below, you agree to our{' '}
               <Link href="#" className="text-blue-600 hover:underline">
                 Terms of Use
               </Link>
@@ -209,7 +212,7 @@ export default function PaymentForm() {
               <Link href="#" className="text-blue-600 hover:underline">
                 Privacy Statement
               </Link>
-              , that you are over 18, and that Netflix will automatically continue your membership and charge the membership fee (currently $6.99/month plus applicable taxes) to your payment method until you cancel. You may cancel at any time to avoid future charges. To cancel, go to Account and click &quot; Cancel Membership&quot; .
+              , that you are over 18, and that Netflix will automatically continue your membership and charge the membership fee (currently $15.49/month plus applicable taxes) to your payment method after the free trial period unless you cancel. You may cancel at any time to avoid future charges. To cancel, go to Account and click &quot;Cancel Membership&quot;.
             </div>
 
             <motion.div
@@ -220,7 +223,7 @@ export default function PaymentForm() {
                 type="submit" 
                 className="w-full bg-red-600 hover:bg-red-700 text-white py-6 text-xl"
               >
-                Start Membership
+                Start Free Trial
               </Button>
             </motion.div>
           </form>

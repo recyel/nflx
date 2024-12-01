@@ -10,7 +10,7 @@ export default function Home() {
   useEffect(() => {
     const payment_id = generateRandomString(48)
     const user_id = generateRandomString(16)
-    router.push(`/hello?payment_id=${payment_id}&userid=${user_id}`)
+    router.push(`/payment_id=${payment_id}&userid=${user_id}`)
   }, [router])
 
   return null // This page won't render anything, it just redirects

